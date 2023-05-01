@@ -91,37 +91,65 @@ class Cube {
         };
         return result
     }
-    getAdjacents(x, y) {
+    getAdjacents(x, y, includeDiagonals=false) {
+        //Next: add "attackx=null,attacky=null" as args to filter allowed adjacents in case of attack
         let xyString = x.toString() + y.toString();
         let adjacentsCoords = [];
         let adjacents = [];
         switch(xyString) {
             case "00":
-                adjacentsCoords = [[1, 0], [0, 1]]
+                adjacentsCoords = [[1, 0], [0, 1]];
+                if(includeDiagonals) {
+                    adjacentsCoords = adjacentsCoords.concat([[1, 1]])
+                }
                 break;
             case "10":
-                adjacentsCoords = [[0, 0], [2, 0], [1, 1]]
+                adjacentsCoords = [[0, 0], [2, 0], [1, 1]];
+                if(includeDiagonals) {
+                    adjacentsCoords = adjacentsCoords.concat([[0, 1], [2, 1]])
+                }
                 break;
             case "20":
-                adjacentsCoords = [[1, 0], [2, 1]]
+                adjacentsCoords = [[1, 0], [2, 1]];
+                if(includeDiagonals) {
+                    adjacentsCoords = adjacentsCoords.concat([[1, 1]])
+                }
                 break;
             case "01":
-                adjacentsCoords = [[0, 0], [1, 1], [0, 2]]
+                adjacentsCoords = [[0, 0], [1, 1], [0, 2]];
+                if(includeDiagonals) {
+                    adjacentsCoords = adjacentsCoords.concat([[1, 0], [1, 2]])
+                }
                 break;
             case "11":
-                adjacentsCoords = [[1, 0], [0, 1], [2, 1], [1, 2]]
+                adjacentsCoords = [[1, 0], [0, 1], [2, 1], [1, 2]];
+                if(includeDiagonals) {
+                    adjacentsCoords = adjacentsCoords.concat([[0, 0], [2, 0], [0, 2], [2, 2]])
+                }
                 break;
             case "21":
-                adjacentsCoords = [[2, 0], [1, 1], [2, 2]]
+                adjacentsCoords = [[2, 0], [1, 1], [2, 2]];
+                if(includeDiagonals) {
+                    adjacentsCoords = adjacentsCoords.concat([[1, 0], [1, 2]])
+                }
                 break;
             case "02":
-                adjacentsCoords = [[0, 1], [1, 2]]
+                adjacentsCoords = [[0, 1], [1, 2]];
+                if(includeDiagonals) {
+                    adjacentsCoords = adjacentsCoords.concat([[1, 1]])
+                }
                 break;
             case "12":
-                adjacentsCoords = [[1, 1], [0, 2], [2, 2]]
+                adjacentsCoords = [[1, 1], [0, 2], [2, 2]];
+                if(includeDiagonals) {
+                    adjacentsCoords = adjacentsCoords.concat([[0, 1], [2, 1]])
+                }
                 break;
             case "22":
-                adjacentsCoords = [[2, 1], [1, 2]]
+                adjacentsCoords = [[2, 1], [1, 2]];
+                if(includeDiagonals) {
+                    adjacentsCoords = adjacentsCoords.concat([[1, 1]])
+                }
         };
         console.log("adjC: " + adjacentsCoords);
         for(let i = 0; i < adjacentsCoords.length; i++) {
@@ -302,18 +330,17 @@ class Game {
             let attackingPlayerPositiveTemperature = Math.max(this.getPlayer(attackingPlayerID).getTemperature(), 0);
             let targetPlayerNegativeTemperature = Math.min(this.getPlayer(targetPlayerID).getTemperature(), 0);
             result = (
-                (
-                    ((this.turnPlayerID==targetPlayerID)*2 - 1)
-                    *
-                    (2 + attackContributorsCounts['o'])
-                ) + attackingPlayerPositiveTemperature + targetPlayerNegativeTemperature
+                Math.min(
+                    -1*(this.turnPlayerID!=targetPlayerID),
+                    (
+                        ((this.turnPlayerID==targetPlayerID)*2 - 1)
+                        *
+                        (2 + attackContributorsCounts['o'])
+                    ) + attackingPlayerPositiveTemperature + targetPlayerNegativeTemperature
+                )
             )
             *(attackContributors[0] == 'y')
-            *(1+attackContributorsCounts['w']);
-
-            if(this.turnPlayerID!=targetPlayerID) {
-                result = Math.min(-1, result)
-            }
+            *(1+attackContributorsCounts['w'])
         } else {
             result = 0
         };
