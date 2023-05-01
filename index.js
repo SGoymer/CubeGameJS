@@ -17,6 +17,12 @@ function arrayEquals(a, b) {
         a.every((val, index) => val === b[index]);
 }
 */
+function xyCoordToString(x,y) {
+    return x.toString() + y.toString();
+}
+function xyStringToCoord(xyString) {
+    return [Number(xyString[0]), Number(xyString[1])]
+}
 class Cube {
     constructor(name,
                 layout = [['w', 'w', 'w'],
@@ -60,7 +66,7 @@ class Cube {
         return countStrings(this.getLayout().flat())
     }
     getSquareType(x, y) {
-        let xyString = x.toString() + y.toString();
+        let xyString = xyCoordToString(x, y);
         switch(xyString) {
             case "00":
                 result = 'diagonal'
@@ -91,9 +97,53 @@ class Cube {
         };
         return result
     }
-    getAdjacents(x, y, includeDiagonals=false) {
-        //Next: add "attackx=null,attacky=null" as args to filter allowed adjacents in case of attack
-        let xyString = x.toString() + y.toString();
+    //Get all squares relevant to an attack at coords x, y
+    getAttackSquaresCoords(x, y) {
+        let xyString = xyCoordToString(x, y);
+        let attackSquaresCoords = [];
+        //let attackSquares = [];
+        switch(xyString) {
+            case "00":
+                attackSquaresCoords = [[0, 0], [1, 0], [0, 1], [1, 1]];
+                break;
+            case "10":
+                attackSquaresCoords = [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1]];
+                break;
+            case "20":
+                attackSquaresCoords = [[1, 0], [2, 0], [1, 1], [2, 1]];
+                break;
+            case "01":
+                attackSquaresCoords = [[0, 0], [1, 0], [0, 1], [1, 1], [0, 2], [1, 2]];
+                break;
+            case "11":
+                attackSquaresCoords = [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1], [0, 2], [1, 2], [2, 2]];
+                break;
+            case "21":
+                attackSquaresCoords = [[1, 0], [2, 0], [1, 1], [2, 1], [1, 2], [2, 2]];
+                break;
+            case "02":
+                attackSquaresCoords = [[0, 1], [1, 1], [0, 2], [1, 2]];
+                break;
+            case "12":
+                attackSquaresCoords = [[0, 1], [1, 1], [2, 1], [0, 2], [1, 2], [2, 2]];
+                break;
+            case "22":
+                attackSquaresCoords = [[1, 1], [2, 1], [1, 2], [2, 2]];
+        };
+        console.log("ASC: " + attackSquaresCoords);
+        /*
+        for(let i = 0; i < attackSquaresCoords.length; i++) {
+            console.log(this.getLayoutxy(attackSquaresCoords[i][0], attackSquaresCoords[i][1]));
+            attackSquares.push(this.getLayoutxy(attackSquaresCoords[i][0], attackSquaresCoords[i][1]))
+        }
+        
+        return attackSquares
+        */
+        return attackSquaresCoords
+    }
+    getAdjacents(x, y, includeDiagonals=false, attackx=null, attacky=null) {
+        //attackx and attacky filter result by allowed squares based on an attack at (x, y).
+        let xyString = xyCoordToString(x, y);
         let adjacentsCoords = [];
         let adjacents = [];
         switch(xyString) {
@@ -151,6 +201,17 @@ class Cube {
                     adjacentsCoords = adjacentsCoords.concat([[1, 1]])
                 }
         };
+        if(attackx != null && attacky != null) {
+            //Get the relevant attack squares
+            let attackSquaresCoords = this.getAttackSquaresCoords(attackx, attacky);
+            //Convert the sets of coords to strings so we can intersect them
+            let attackSquaresString = attackSquaresCoords.map(coords => xyCoordToString(coords[0],coords[1]));
+            let adjacentsCoordsString = adjacentsCoords.map(coords => xyCoordToString(coords[0],coords[1]));
+            //Intersect the two string arrays
+            adjacentsCoordsString = attackSquaresString.filter(value => adjacentsCoordsString.includes(value));
+            //Convert back to coords
+            adjacentsCoords = adjacentsCoordsString.map(coordsString => xyStringToCoord(coordsString))
+        }
         console.log("adjC: " + adjacentsCoords);
         for(let i = 0; i < adjacentsCoords.length; i++) {
             console.log(this.getLayoutxy(adjacentsCoords[i][0], adjacentsCoords[i][1]));
@@ -219,11 +280,18 @@ class Game {
         return this.gameNo
     }
     checkGameOver() {
-        return this.Player1.getHealth() < 0 || this.Player2.getHealth < 0
+        return this.Player1.getHealth() <= 0 || this.Player2.getHealth <= 0
     }
     gameOver() {
         this.isActive = false;
-        this.result = this.getTurnPlayerID()
+        //If both players died, it's a draw (result 0). Otherwise the player with positive health
+        if(this.Player1.getHealth() <= 0 && this.Player2.getHealth <= 0) {
+            this.result = 0
+        } else if(this.Player1.getHealth() <= 0) {
+            this.result = 2
+        } else {
+            this.result = 1
+        }
     }
     getTurnNumber() {
         return this.turnNumber
@@ -302,11 +370,12 @@ class Game {
         let attackContributorsCounts = countStrings(attackContributors[1]);
         let targetPlayerNegativeTemperature = Math.min(this.getPlayer(targetPlayerID).getTemperature(), 0);
         //+1 poison per hit if targeting opponent, -2 poison per hit if healing self.
-        //+1 extra poision per hit per negative temperature if targeting opponent with a negative temperature
+        //+1 extra poision per hit per negative temperature if target has a negative temperature
         poisonChange = (
             ((this.turnPlayerID!=targetPlayerID)*3 - 2) //1 if targeting opponent, -2 if targeting self
-            - targetPlayerNegativeTemperature //+1 extra poision per hit per negative temperature if targeting opponent with a negative temperature
-            + attackContributorsCounts['o']
+            *(1 - targetPlayerNegativeTemperature) //+1 extra poision per hit per negative temperature if target has a negative temperature
+            +
+            ((this.turnPlayerID!=targetPlayerID)*2 - 1)*(attackContributorsCounts['o'])
         )
         *
         (attackContributors[0] == 'g')
@@ -323,27 +392,24 @@ class Game {
         return [poisonChange, temperatureChange, attackContributors, attackContributorsCounts]
     }
     getHealthChange(attackingPlayerID, targetPlayerID, attackContributors, attackContributorsCounts) {
-        let result = 0;
-        if(attackContributors[0] == 'y') {
-            //If to opponent, add self temperature (if positive) and add (negative) opponent temperature (if negative)
-            //Opponent negative temperature deductions can't reduce the damage to below 1.
-            let attackingPlayerPositiveTemperature = Math.max(this.getPlayer(attackingPlayerID).getTemperature(), 0);
-            let targetPlayerNegativeTemperature = Math.min(this.getPlayer(targetPlayerID).getTemperature(), 0);
-            result = (
-                Math.min(
-                    -1*(this.turnPlayerID!=targetPlayerID),
-                    (
-                        ((this.turnPlayerID==targetPlayerID)*2 - 1)
-                        *
-                        (2 + attackContributorsCounts['o'])
-                    ) + attackingPlayerPositiveTemperature + targetPlayerNegativeTemperature
-                )
-            )
-            *(attackContributors[0] == 'y')
-            *(1+attackContributorsCounts['w'])
-        } else {
-            result = 0
-        };
+        //If to opponent, add self temperature (if positive) and add (negative) opponent temperature (if negative)
+        let attackingPlayerPositiveTemperature = Math.max(this.getPlayer(attackingPlayerID).getTemperature(), 0);
+        let targetPlayerNegativeTemperature = Math.min(this.getPlayer(targetPlayerID).getTemperature(), 0);
+        let result = (
+            ((this.turnPlayerID==targetPlayerID)*2 - 1)
+            *
+            (2 + attackContributorsCounts['o'])
+            - (this.turnPlayerID!=targetPlayerID)*(attackingPlayerPositiveTemperature + targetPlayerNegativeTemperature)
+        );
+        console.log("healthChangeResult: " + result)
+        //Opponent negative temperature deductions can't reduce the damage to below 1 per hit.
+        if(this.turnPlayerID!=targetPlayerID) {
+            result = Math.min(-1, result)
+        }
+
+        //Then check if an attack and add w extra hits
+        result = result*(attackContributors[0] == 'y')*(1+attackContributorsCounts['w']);
+
         return result
     }
     checkLegalAttack(allowedSquareType, x, y) {
@@ -369,22 +435,29 @@ class Game {
         let attackContributorsCounts = SC_AC_Array[3];
         let healthChange = this.getHealthChange(this.turnPlayerID, targetPlayerID, attackContributors, attackContributorsCounts)
         if(carryOutAttack) {
-            this.getPlayer(targetPlayerID).setPoison(this.getPlayer(targetPlayerID).getPoison() + poisonChange);
+            //Adjust poison, temperature and health. Poison can't go below 0; health must be between 0 and 100
+            this.getPlayer(targetPlayerID).setPoison(Math.max(0, this.getPlayer(targetPlayerID).getPoison() + poisonChange));
             this.getPlayer(targetPlayerID).setTemperature(this.getPlayer(targetPlayerID).getTemperature() + temperatureChange);
-            this.getPlayer(targetPlayerID).setHealth(this.getPlayer(targetPlayerID).getHealth() + healthChange);
+            this.getPlayer(targetPlayerID).setHealth(Math.min(100, Math.max(0, this.getPlayer(targetPlayerID).getHealth() + healthChange)));
         }
         console.log({attackingPlayer: this.turnPlayerID, targetPlayer: targetPlayerID, healthChange: healthChange, poisonChange: poisonChange, temperatureChange: temperatureChange})
         return({attackingPlayer: this.turnPlayerID, targetPlayer: targetPlayerID, healthChange: healthChange, poisonChange: poisonChange, temperatureChange: temperatureChange})
     }
     doPoisonDamage() {
+        let poisonDamageDealt = []
         for (let playerID = 1; playerID < 3; playerID++) {
-            this.getPlayer(this.playerID).setHealth(this.getPlayer(playerID).getHealth() - this.getPlayer(playerID).getPoison())
+            this.getPlayer(playerID).setHealth(this.getPlayer(playerID).getHealth() - this.getPlayer(playerID).getPoison());
+            poisonDamageDealt.push(this.getPlayer(playerID).getPoison())
         }
+        return poisonDamageDealt
     }
     doHotDamage() {
+        let hotDamageDealt = []
         for (let playerID = 1; playerID < 3; playerID++) {
-            this.getPlayer(this.playerID).setHealth(this.getPlayer(playerID).getHealth() - Math.max(this.getPlayer(playerID).getTemperature(), 0))
+            this.getPlayer(playerID).setHealth(this.getPlayer(playerID).getHealth() - Math.max(this.getPlayer(playerID).getTemperature(), 0));
+            hotDamageDealt.push(Math.max(this.getPlayer(playerID).getTemperature(), 0))
         }
+        return hotDamageDealt
     }
 
     //Next: add turn functionality (choosing type of attack etc)
@@ -565,7 +638,7 @@ class Game {
             if(firstAttackTarget == "self") {
                 console.log("Healed for " + firstAttackResult["healthChange"] + ". Now at " + this.getTurnPlayer().getHealth() + " health.");
                 console.log("Healed " + firstAttackResult["poisonChange"] + " poison. Now at " + this.getTurnPlayer().getPoison() + " poison.");
-                console.log("Changed temperature by " + firstAttackResult["temperatureChange"] + " poison. Now at " + this.getTurnPlayer().getTemperature() + " temperature.");               
+                console.log("Changed temperature by " + firstAttackResult["temperatureChange"] + ". Now at " + this.getTurnPlayer().getTemperature() + " temperature.");               
             } else {
                 console.log("Dealt " + firstAttackResult["healthChange"] + " damage. Opponent now at " + this.getNotTurnPlayer().getHealth() + " health.");
                 console.log("Inflicted " + firstAttackResult["poisonChange"] + " poison. Opponent now at " + this.getNotTurnPlayer().getPoison() + " poison.");
@@ -597,7 +670,7 @@ class Game {
                 if(secondAttackTarget == "self") {
                     console.log("Healed for " + secondAttackResult["healthChange"] + ". Now at " + this.getTurnPlayer().getHealth() + " health.");
                     console.log("Healed " + secondAttackResult["poisonChange"] + " poison. Now at " + this.getTurnPlayer().getPoison() + " poison.");
-                    console.log("Changed temperature by " + secondAttackResult["temperatureChange"] + " poison. Now at " + this.getTurnPlayer().getTemperature() + " temperature.");               
+                    console.log("Changed temperature by " + secondAttackResult["temperatureChange"] + ". Now at " + this.getTurnPlayer().getTemperature() + " temperature.");               
                 } else {
                     console.log("Dealt " + secondAttackResult["healthChange"] + " damage. Opponent now at " + this.getNotTurnPlayer().getHealth() + " health.");
                     console.log("Inflicted " + secondAttackResult["poisonChange"] + " poison. Opponent now at " + this.getNotTurnPlayer().getPoison() + " poison.");
@@ -612,7 +685,34 @@ class Game {
                     console.log("That's a KO! Player " + this.result + " wins!")
                 }
             };
-        }
+        };
+
+        if(this.isActive) {
+            //Do fire and poison damage. Check if anyone died; if so, end the game
+            let hotDamageDealt = this.doHotDamage();
+            let poisonDamageDealt = this.doPoisonDamage();
+            if(verbose) {
+                console.log("End of turn damage:")
+                for(let i = 0; i < 2; i++) {
+                    console.log("Player " + (i+1) + " takes " + hotDamageDealt[i] + " hot damage!")
+                    console.log("Player " + (i+1) + " takes " + poisonDamageDealt[i] + " poison damage!")
+                };
+                for(let i = 0; i < 2; i++) {
+                    console.log("Player status:");
+                    console.log(this.getPlayer(i+1));
+                    //console.log("Player " + (i+1) + " is now at " + this.getPlayer(i+1).getHealth() + " health.")
+                };
+            }
+            if(this.checkGameOver()) {
+                this.gameOver()
+                if(verbose) {
+                    if(this.result == 0) {
+                        console.log("Both players KO'd! The game is a draw!")
+                    }
+                    console.log("That's a KO! Player " + this.result + " wins!")
+                }
+            };
+        };
     }
     playGame(useJquery=true, verbose=false) {
         if(verbose) {
@@ -629,13 +729,13 @@ class Game {
 }
 
 let firstGame = new Game(
-    p1Cube = [['y', 'w', 'y'],
-              ['o', 'y', 'o'],
-              ['y', 'w', 'y']]
+    p1Cube = [['y', 'o', 'g'],
+              ['w', 'g', 'w'],
+              ['g', 'g', 'g']]
     ,
-    p2Cube = [['y', 'y', 'y'],
-              ['y', 'y', 'y'],
-              ['y', 'y', 'y']]
+    p2Cube = [['r', 'o', 'r'],
+              ['w', 'r', 'w'],
+              ['r', 'r', 'r']]
     );
 firstGame.playGame(useJquery = false, verbose=true);
-//Next: QA damage on edges/diagonals, posion, temp change
+//Next: Do damage on a per-cube basis.
