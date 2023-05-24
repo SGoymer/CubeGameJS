@@ -212,9 +212,9 @@ class Cube {
             //Convert back to coords
             adjacentsCoords = adjacentsCoordsString.map(coordsString => xyStringToCoord(coordsString))
         }
-        console.log("adjC: " + adjacentsCoords);
+        //console.log("adjC: " + adjacentsCoords);
         for(let i = 0; i < adjacentsCoords.length; i++) {
-            console.log(this.getLayoutxy(adjacentsCoords[i][0], adjacentsCoords[i][1]));
+            //console.log(this.getLayoutxy(adjacentsCoords[i][0], adjacentsCoords[i][1]));
             adjacents.push(this.getLayoutxy(adjacentsCoords[i][0], adjacentsCoords[i][1]))
         }
         return adjacents
@@ -373,7 +373,8 @@ class Game {
         //+1 extra poision per hit per negative temperature if target has a negative temperature
         poisonChange = (
             ((this.turnPlayerID!=targetPlayerID)*3 - 2) //1 if targeting opponent, -2 if targeting self
-            *(1 - targetPlayerNegativeTemperature*(this.turnPlayerID!=targetPlayerID)) //+1 extra poision per hit per negative temperature if targetting opponent with negative temperature
+            -
+            ((this.turnPlayerID!=targetPlayerID)*2 - 1)*targetPlayerNegativeTemperature //+1/-1 extra poision per hit per negative temperature 
             +
             ((this.turnPlayerID!=targetPlayerID)*2 - 1)*(attackContributorsCounts['o'])
         )
@@ -628,7 +629,7 @@ class Game {
             if(firstAttackTarget == "self") {
                 console.log("Player " + this.turnPlayerID)
             } else {
-                console.log("Player " + this.turnPlayerID + " attacks Player " + this.getNotTurnPlayerID() + "!")
+                console.log("Player " + this.turnPlayerID + " targets Player " + secondAttackTargetID + "!")
             }
         };
 
@@ -661,7 +662,7 @@ class Game {
                 if(firstAttackTarget == "self") {
                     console.log("Player " + this.turnPlayerID)
                 } else {
-                    console.log("Player " + this.turnPlayerID + " attacks Player " + this.getNotTurnPlayerID() + "!")
+                    console.log("Player " + this.turnPlayerID + " targets Player " + secondAttackTargetID + "!")
                 }
             };
 
@@ -734,8 +735,8 @@ let firstGame = new Game(
               ['w', 'g', 'o'],
               ['w', 'g', 'w']]
     ,
-    p2Cube = [['y', 'w', 'r'],
-              ['w', 'g', 'o'],
-              ['w', 'y', 'w']]
+    p2Cube = [['g', 'w', 'y'],
+              ['o', 'r', 'w'],
+              ['w', 'g', 'w']]
     );
 firstGame.playGame(useJquery=false, verbose=true);
