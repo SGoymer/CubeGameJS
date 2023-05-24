@@ -280,12 +280,12 @@ class Game {
         return this.gameNo
     }
     checkGameOver() {
-        return this.Player1.getHealth() <= 0 || this.Player2.getHealth <= 0
+        return this.Player1.getHealth() <= 0 || this.Player2.getHealth() <= 0
     }
     gameOver() {
         this.isActive = false;
         //If both players died, it's a draw (result 0). Otherwise the player with positive health
-        if(this.Player1.getHealth() <= 0 && this.Player2.getHealth <= 0) {
+        if(this.Player1.getHealth() <= 0 && this.Player2.getHealth() <= 0) {
             this.result = 0
         } else if(this.Player1.getHealth() <= 0) {
             this.result = 2
@@ -373,7 +373,7 @@ class Game {
         //+1 extra poision per hit per negative temperature if target has a negative temperature
         poisonChange = (
             ((this.turnPlayerID!=targetPlayerID)*3 - 2) //1 if targeting opponent, -2 if targeting self
-            *(1 - targetPlayerNegativeTemperature) //+1 extra poision per hit per negative temperature if target has a negative temperature
+            *(1 - targetPlayerNegativeTemperature*(this.turnPlayerID!=targetPlayerID)) //+1 extra poision per hit per negative temperature if targetting opponent with negative temperature
             +
             ((this.turnPlayerID!=targetPlayerID)*2 - 1)*(attackContributorsCounts['o'])
         )
@@ -387,8 +387,8 @@ class Game {
             +
             (attackContributors[0] =='b')*(-1 - attackContributorsCounts['o'])*(1+attackContributorsCounts['w'])
         )
-        console.log("[pC, tC, aC, ACC]");
-        console.log([poisonChange, temperatureChange, attackContributors, attackContributorsCounts]);
+        //console.log("[pC, tC, aC, ACC]");
+        //console.log([poisonChange, temperatureChange, attackContributors, attackContributorsCounts]);
         return [poisonChange, temperatureChange, attackContributors, attackContributorsCounts]
     }
     getHealthChange(attackingPlayerID, targetPlayerID, attackContributors, attackContributorsCounts) {
@@ -401,7 +401,7 @@ class Game {
             (2 + attackContributorsCounts['o'])
             - (this.turnPlayerID!=targetPlayerID)*(attackingPlayerPositiveTemperature + targetPlayerNegativeTemperature)
         );
-        console.log("healthChangeResult: " + result)
+        //console.log("healthChangeResult: " + result)
         //Opponent negative temperature deductions can't reduce the damage to below 1 per hit.
         if(this.turnPlayerID!=targetPlayerID) {
             result = Math.min(-1, result)
@@ -440,7 +440,7 @@ class Game {
             this.getPlayer(targetPlayerID).setTemperature(this.getPlayer(targetPlayerID).getTemperature() + temperatureChange);
             this.getPlayer(targetPlayerID).setHealth(Math.min(100, Math.max(0, this.getPlayer(targetPlayerID).getHealth() + healthChange)));
         }
-        console.log({attackingPlayer: this.turnPlayerID, targetPlayer: targetPlayerID, healthChange: healthChange, poisonChange: poisonChange, temperatureChange: temperatureChange})
+        //console.log({attackingPlayer: this.turnPlayerID, targetPlayer: targetPlayerID, healthChange: healthChange, poisonChange: poisonChange, temperatureChange: temperatureChange})
         return({attackingPlayer: this.turnPlayerID, targetPlayer: targetPlayerID, healthChange: healthChange, poisonChange: poisonChange, temperatureChange: temperatureChange})
     }
     doPoisonDamage() {
@@ -490,7 +490,7 @@ class Game {
             }
         //}
         ;
-        console.log(selectedSquareType)
+        //console.log(selectedSquareType)
         if(selectedSquareType == "d") {
             selectedSquareType = "diagonal"
         };
@@ -698,18 +698,19 @@ class Game {
                     console.log("Player " + (i+1) + " takes " + poisonDamageDealt[i] + " poison damage!")
                 };
                 for(let i = 0; i < 2; i++) {
-                    console.log("Player status:");
+                    console.log("Player " + (i+1) + " status:");
                     console.log(this.getPlayer(i+1));
                     //console.log("Player " + (i+1) + " is now at " + this.getPlayer(i+1).getHealth() + " health.")
                 };
-            }
+            };
             if(this.checkGameOver()) {
                 this.gameOver()
                 if(verbose) {
                     if(this.result == 0) {
                         console.log("Both players KO'd! The game is a draw!")
+                    } else {
+                        console.log("That's a KO! Player " + this.result + " wins!")
                     }
-                    console.log("That's a KO! Player " + this.result + " wins!")
                 }
             };
         };
@@ -729,13 +730,12 @@ class Game {
 }
 
 let firstGame = new Game(
-    p1Cube = [['y', 'o', 'g'],
-              ['w', 'g', 'w'],
-              ['g', 'g', 'g']]
+    p1Cube = [['g', 'w', 'b'],
+              ['w', 'g', 'o'],
+              ['w', 'g', 'w']]
     ,
-    p2Cube = [['r', 'o', 'r'],
-              ['w', 'r', 'w'],
-              ['r', 'r', 'r']]
+    p2Cube = [['y', 'w', 'r'],
+              ['w', 'g', 'o'],
+              ['w', 'y', 'w']]
     );
-firstGame.playGame(useJquery = false, verbose=true);
-//Next: Do damage on a per-cube basis.
+firstGame.playGame(useJquery=false, verbose=true);
