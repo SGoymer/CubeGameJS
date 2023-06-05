@@ -264,15 +264,16 @@ class Game {
                  ['w', 'w', 'w'],
                  ['w', 'w', 'w']],
 
-        gameNo=0, turnNumber=0, turnPlayerID=1, allowedSquareType=null, isActive=true, result=null
+        maxHealth=100, gameNo=0, turnNumber=0, turnPlayerID=1, allowedSquareType=null, isActive=true, result=null
     ) {
+        this.maxHealth = maxHealth,
         this.gameNo = gameNo,
         this.turnNumber = turnNumber,
         this.turnPlayerID = turnPlayerID,
         this.isActive = isActive,
         this.result = result,
-        this.Player1 = new Player(1),
-        this.Player2 = new Player(2),
+        this.Player1 = new Player(1, maxHealth),
+        this.Player2 = new Player(2, maxHealth),
         this.p1Cube = new Cube('p1Cube', p1Cube),
         this.p2Cube = new Cube('p2Cube', p2Cube)
     }
@@ -356,6 +357,13 @@ class Game {
             return this.p2Cube
         }
     }
+    getNotTurnPlayerCube() {
+        if(this.turnPlayerID == 1) {
+            return this.p2Cube
+        } else {
+            return this.p1Cube
+        }
+    }
     getPlayerCubexy(playerNo, x, y) {
         if(playerNo == 1) {
             return this.p1Cube.getLayoutxy(x, y)
@@ -374,7 +382,8 @@ class Game {
         poisonChange = (
             ((this.turnPlayerID!=targetPlayerID)*3 - 2) //1 if targeting opponent, -2 if targeting self
             -
-            ((this.turnPlayerID!=targetPlayerID)*2 - 1)*targetPlayerNegativeTemperature //+1/-1 extra poision per hit per negative temperature 
+            //((this.turnPlayerID!=targetPlayerID)*2 - 1)*targetPlayerNegativeTemperature //+1/-1 extra poision per hit per negative temperature 
+            ((this.turnPlayerID!=targetPlayerID)*targetPlayerNegativeTemperature) //+1 extra poision per hit per negative temperature if targeting opponent
             +
             ((this.turnPlayerID!=targetPlayerID)*2 - 1)*(attackContributorsCounts['o'])
         )
@@ -436,10 +445,10 @@ class Game {
         let attackContributorsCounts = SC_AC_Array[3];
         let healthChange = this.getHealthChange(this.turnPlayerID, targetPlayerID, attackContributors, attackContributorsCounts)
         if(carryOutAttack) {
-            //Adjust poison, temperature and health. Poison can't go below 0; health must be between 0 and 100
+            //Adjust poison, temperature and health. Poison can't go below 0; health must be between 0 and maxHealth
             this.getPlayer(targetPlayerID).setPoison(Math.max(0, this.getPlayer(targetPlayerID).getPoison() + poisonChange));
             this.getPlayer(targetPlayerID).setTemperature(this.getPlayer(targetPlayerID).getTemperature() + temperatureChange);
-            this.getPlayer(targetPlayerID).setHealth(Math.min(100, Math.max(0, this.getPlayer(targetPlayerID).getHealth() + healthChange)));
+            this.getPlayer(targetPlayerID).setHealth(Math.min(this.maxHealth, Math.max(0, this.getPlayer(targetPlayerID).getHealth() + healthChange)));
         }
         //console.log({attackingPlayer: this.turnPlayerID, targetPlayer: targetPlayerID, healthChange: healthChange, poisonChange: poisonChange, temperatureChange: temperatureChange})
         return({attackingPlayer: this.turnPlayerID, targetPlayer: targetPlayerID, healthChange: healthChange, poisonChange: poisonChange, temperatureChange: temperatureChange})
@@ -452,13 +461,14 @@ class Game {
         }
         return poisonDamageDealt
     }
-    doHotDamage() {
-        let hotDamageDealt = []
+    doHotDamageColdHealing() {
+        let healthChanges = []
         for (let playerID = 1; playerID < 3; playerID++) {
-            this.getPlayer(playerID).setHealth(this.getPlayer(playerID).getHealth() - Math.max(this.getPlayer(playerID).getTemperature(), 0));
-            hotDamageDealt.push(Math.max(this.getPlayer(playerID).getTemperature(), 0))
+            //this.getPlayer(playerID).setHealth(this.getPlayer(playerID).getHealth() - Math.max(this.getPlayer(playerID).getTemperature(), 0));
+            this.getPlayer(playerID).setHealth(Math.min(this.getPlayer(playerID).getHealth() - this.getPlayer(playerID).getTemperature(), this.maxHealth));
+            healthChanges.push(Math.abs(this.getPlayer(playerID).getTemperature()))
         }
-        return hotDamageDealt
+        return healthChanges
     }
 
     //Next: add turn functionality (choosing type of attack etc)
@@ -483,7 +493,11 @@ class Game {
             });
         } else {
         */
-            selectedSquareType = prompt("Select which attack types are available this round: d for diagonal, e for edge, c for centre.")
+            console.log("Your Cube:");
+            this.getTurnPlayerCube().printLayout();
+            console.log("Opponent Cube:");
+            this.getNotTurnPlayerCube().printLayout();
+            selectedSquareType = prompt("\nSelect which attack types are available this round: d for diagonal, e for edge, c for centre.")
             if(!["d", "e", "c"].includes(selectedSquareType)) {
                 while(!["d", "e", "c"].includes(selectedSquareType)) {
                     selectedSquareType = prompt("Please enter your attack type in the format 'd', 'e', or 'c'.")
@@ -527,7 +541,7 @@ class Game {
         } else {
             */
             this.getTurnPlayerCube().printLayout();
-            selectedAttackxy = prompt("Select which square to attack from using the format 'xy'. You can use a " + this.allowedSquareType + " attack this turn.");
+            selectedAttackxy = prompt("\nSelect which square to attack from using the format 'xy'. You can use a " + this.allowedSquareType + " attack this turn.");
 
             if(!this.checkLegalAttack(this.allowedSquareType, Number(selectedAttackxy[0]), Number(selectedAttackxy[1]))) {
                 while(!this.checkLegalAttack(this.allowedSquareType, Number(selectedAttackxy[0]), Number(selectedAttackxy[1]))) {
@@ -577,7 +591,7 @@ class Game {
         //Go to the next turn
         this.nextTurn();
         if(verbose) {
-            console.log("Advancing to Turn " + this.turnNumber)
+            console.log("Advancing to Turn " + this.turnNumber + "\n")
         };
 
         //Advance the active player
@@ -689,14 +703,20 @@ class Game {
         };
 
         if(this.isActive) {
-            //Do fire and poison damage. Check if anyone died; if so, end the game
-            let hotDamageDealt = this.doHotDamage();
+            //Do temperature health change and poison damage. Check if anyone died; if so, end the game
+            let temperatureHealthChange = this.doHotDamageColdHealing();
             let poisonDamageDealt = this.doPoisonDamage();
             if(verbose) {
                 console.log("End of turn damage:")
                 for(let i = 0; i < 2; i++) {
-                    console.log("Player " + (i+1) + " takes " + hotDamageDealt[i] + " hot damage!")
+                    if(temperatureHealthChange[i] < 0) {
+                    console.log("Player " + (i+1) + " takes " + temperatureHealthChange[i] + " hot damage!")
+                    } else if(temperatureHealthChange[i] > 0) {
+                    console.log("Player " + (i+1) + " heals " + temperatureHealthChange[i] + " from cooling!")
+                    };
+                    if(poisonDamageDealt[i] != 0) {
                     console.log("Player " + (i+1) + " takes " + poisonDamageDealt[i] + " poison damage!")
+                    }
                 };
                 for(let i = 0; i < 2; i++) {
                     console.log("Player " + (i+1) + " status:");
